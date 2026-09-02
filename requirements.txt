@@ -1,0 +1,10 @@
+matplotlib>=3.7,<4
+numpy>=1.24,<2
+opencv-python-headless>=4.8,<5
+Pillow>=9,<13
+PyYAML>=6,<7
+scikit-learn>=1.2,<2
+seaborn>=0.12,<1
+torch>=2.5,<3
+torchvision>=0.20,<1
+tqdm>=4.64,<5

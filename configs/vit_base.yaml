@@ -1,0 +1,59 @@
+# Vision Transformer Base Configuration for Defect Detection
+# Based on ViT-Base/16 architecture
+
+model:
+  # Architecture
+  img_size: 224
+  patch_size: 16
+  in_channels: 3
+  num_classes: 5
+
+  # Transformer parameters
+  embed_dim: 768
+  depth: 12
+  num_heads: 8
+  mlp_ratio: 4.0
+
+  # Regularization
+  dropout: 0.1
+  attention_dropout: 0.1
+
+data:
+  # Dataset settings
+  root_dir: './data'
+  generate_on_fly: true
+
+  # Data sizes
+  train_samples: 10000
+  val_samples: 2000
+  test_samples: 2000
+
+  # Data loading
+  batch_size: 32
+  num_workers: 4
+  pin_memory: true
+  seed: 42
+
+training:
+  # Training settings
+  epochs: 100
+  output_dir: './experiments/vit_base_defect_detection'
+
+  # Optimization
+  lr: 0.001
+  weight_decay: 0.05
+  min_lr: 0.00001
+
+  # Mixed precision
+  mixed_precision: true
+
+  # Early stopping
+  early_stopping_patience: 15
+  early_stopping_delta: 0.001
+
+  # Resume training (set to null for new training)
+  resume_from: null
+
+hardware:
+  # Training uses one CPU or CUDA device per process.
+  device: auto

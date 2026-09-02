@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python-version: "3.10"
+          - os: ubuntu-latest
+            python-version: "3.12"
+          - os: windows-latest
+            python-version: "3.11"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install package and test tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ".[dev]"
+
+      - name: Validate source and configuration
+        run: |
+          python -m compileall -q src scripts examples demo
+          python -m black --check src scripts examples demo tests
+          python -m flake8 src scripts examples demo tests --select=E9,F63,F7,F82
+          python -m src.utils.config_validator configs/smoke.yaml
+          python -m src.utils.config_validator configs/vit_base.yaml
+
+      - name: Run tests
+        run: python -m pytest -q
+
+      - name: Run quick start
+        run: python examples/quick_start.py
+
+      - name: Verify optional ONNX path
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        run: |
+          python -m pip install ".[export]"
+          python -m src.train --config configs/smoke.yaml
+          python -m scripts.generate_synthetic_data --num-samples 10 --output-dir data/onnx-smoke --img-size 32 --num-base-components 1 --num-workers 1
+          python -m scripts.export_onnx --model-path experiments/smoke/checkpoints/best_model.pth --output-path experiments/smoke/model.onnx
+          python -m src.inference --model-path experiments/smoke/model.onnx --image-path data/onnx-smoke/images/test_000000_ok.png --output experiments/smoke/onnx-result.json
+
+      - name: Build and verify distribution
+        run: |
+          python -m build
+          python -c "from pathlib import Path; import subprocess, sys; wheel = next(Path('dist').glob('*.whl')); subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--force-reinstall', '--no-deps', str(wheel)])"
+          python -c "from importlib.metadata import requires; from packaging.requirements import Requirement; dependencies = {Requirement(item).name.lower() for item in (requires('vision-transformer-defect-detection') or [])}; expected = {'matplotlib', 'numpy', 'opencv-python-headless', 'pillow', 'pyyaml', 'scikit-learn', 'seaborn', 'torch', 'torchvision', 'tqdm'}; assert expected <= dependencies, expected - dependencies"
+          python -c "import os, tempfile; os.chdir(tempfile.mkdtemp()); import scripts.export_onnx, scripts.generate_synthetic_data, src, src.data.dataset, src.inference, src.train; print(src.__file__)"
+          python -c "from pathlib import Path; import os, subprocess, sys, tempfile; os.chdir(tempfile.mkdtemp()); scripts = Path(sys.executable).parent; suffix = '.exe' if os.name == 'nt' else ''; [subprocess.check_call([str(scripts / (command + suffix)), '--help']) for command in ('vit-train', 'vit-inference', 'vit-export-onnx', 'vit-generate-data')]"
